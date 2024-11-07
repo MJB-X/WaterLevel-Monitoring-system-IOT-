@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tank Settings</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #121212;
+        color: #e0e0e0;
+      }
+      h1 {
+        font-size: 24px;
+        color: #fff;
+        margin-bottom: 16px;
+      }
+      .form-container {
+        width: 100%;
+        max-width: 360px;
+        background: #1f1f1f;
+        padding: 16px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+      .form-group {
+        margin-bottom: 12px;
+      }
+      label {
+        font-size: 14px;
+        margin-bottom: 6px;
+        display: block;
+        color: #aaa;
+      }
+      input[type="number"],
+      input[type="checkbox"] {
+        width: 100%;
+        padding: 8px;
+        font-size: 14px;
+        background: #333;
+        border: none;
+        border-radius: 4px;
+        color: #e0e0e0;
+      }
+      input[type="checkbox"] {
+        width: auto;
+        margin-right: 8px;
+      }
+      button {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        color: #121212;
+        background-color: #03dac6;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .error {
+        font-size: 12px;
+        color: #cf6679;
+        margin-top: 4px;
+      }
+      #alertSettings {
+        display: none;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #333;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Tank Settings</h1>
+    <div class="form-container">
+      <div class="form-group">
+        <label for="tankHeight">Tank Height (cm)</label>
+        <input type="number" id="tankHeight" min="1" placeholder="Enter tank height" />
+        <div id="tankHeightError" class="error"></div>
+      </div>
+      <div class="form-group">
+        <label for="maxLevel">Max Water Level (cm)</label>
+        <input type="number" id="maxLevel" min="1" placeholder="Enter max water level" />
+        <div id="maxLevelError" class="error"></div>
+      </div>
+      <div class="form-group">
+        <label for="frequency">Sensor Frequency (sec)</label>
+        <input type="number" id="frequency" min="1" placeholder="Enter frequency" />
+        <div id="frequencyError" class="error"></div>
+      </div>
+      <div class="form-group">
+        <label><input type="checkbox" id="enableAlert" /> Enable Alert</label>
+      </div>
+      <div id="alertSettings">
+        <div class="form-group">
+          <label for="belowLevelPercentage">Alert Below (%)</label>
+          <input type="number" id="belowLevelPercentage" min="1" max="100" placeholder="Enter below %" />
+          <div id="belowLevelPercentageError" class="error"></div>
+        </div>
+        <div class="form-group">
+          <label for="aboveLevelPercentage">Alert Above (%)</label>
+          <input type="number" id="aboveLevelPercentage" min="1" max="100" placeholder="Enter above %" />
+          <div id="aboveLevelPercentageError" class="error"></div>
+        </div>
+        <div class="form-group">
+          <label for="belowToneFrequency">Below Tone Frequency (Hz)</label>
+          <input type="number" id="belowToneFrequency" min="1" placeholder="Enter frequency" />
+          <div id="belowToneFrequencyError" class="error"></div>
+        </div>
+        <div class="form-group">
+          <label for="aboveToneFrequency">Above Tone Frequency (Hz)</label>
+          <input type="number" id="aboveToneFrequency" min="1" placeholder="Enter frequency" />
+          <div id="aboveToneFrequencyError" class="error"></div>
+        </div>
+      </div>
+      <button onclick="saveSettings()">Save Settings</button>
+    </div>
+
+
+
+
+    <script>
+      const socket = new WebSocket("ws://" + location.host + "/ws");
+    
+      socket.onopen = () => {
+        console.log("WebSocket connected");
+        socket.send(JSON.stringify({ type: "getSettings" }));
+      };
+    
+      socket.onmessage = function (event) {
+        const data = JSON.parse(event.data);
+        console.log("data", data);
+        if (data.type === "settingsData") {
+          // Populate the form fields with received data
+          document.getElementById("tankHeight").value = data.tankHeight || "";
+          document.getElementById("maxLevel").value = data.maxLevel || "";
+          document.getElementById("frequency").value = data.frequency || "";
+          document.getElementById("enableAlert").checked = data.alertAboveEnabled || false;
+          document.getElementById("belowLevelPercentage").value = data.belowLevelPercentage || "";
+          document.getElementById("aboveLevelPercentage").value = data.aboveLevelPercentage || "";
+          document.getElementById("belowToneFrequency").value = data.belowToneFrequency || "";
+          document.getElementById("aboveToneFrequency").value = data.aboveToneFrequency || "";
+          toggleAlertSettings();
+        } else if (data.type === "updateConfirmation") {
+          // Redirect to homepage on successful settings update confirmation
+          window.location.href = "/";
+        }
+      };
+    
+      document.getElementById("enableAlert").addEventListener("change", toggleAlertSettings);
+    
+      function toggleAlertSettings() {
+        document.getElementById("alertSettings").style.display = document.getElementById("enableAlert").checked ? "block" : "none";
+      }
+    
+      function saveSettings() {
+        const fields = [
+          "tankHeight", "maxLevel", "frequency", "belowLevelPercentage", 
+          "aboveLevelPercentage", "belowToneFrequency", "aboveToneFrequency"
+        ];
+        let isValid = true;
+    
+        fields.forEach((id) => {
+          const value = document.getElementById(id).value;
+          document.getElementById(id + "Error").textContent = "";
+          if (value <= 0 || (id.includes("Percentage") && value > 100)) {
+            document.getElementById(id + "Error").textContent = `${id} must be valid.`;
+            isValid = false;
+          }
+        });
+    
+        if (isValid) {
+          const settings = {
+            type: "updateSettings",
+            enableAlert: document.getElementById("enableAlert").checked,
+          };
+          fields.forEach((id) => (settings[id] = document.getElementById(id).value));
+          socket.send(JSON.stringify(settings));
+          
+        }
+      }
+    </script>
+    
+  </body>
+</html>
